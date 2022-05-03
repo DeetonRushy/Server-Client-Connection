@@ -1,6 +1,6 @@
 ## C# Client-Server Connection (Windows)
 
-This is my first ever experience with anything connection based. It's a simple client-server connection. The client is can be controlled by the server with commands sent over sockets (in plaintext). 
+This is my first ever experience with anything connection based. It's a simple client-server connection. The client can be controlled by the server with commands sent over sockets (in plaintext). 
 
 ### Disclaimer
 This is very far from **secure** and should not, in any circumstance be used for any actual connections between real clients in it's current state.
