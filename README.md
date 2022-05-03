@@ -1,4 +1,4 @@
-## C# Client-Server Connection
+## C# Client-Server Connection (Windows)
 
 This is my first ever experience with anything connection based. It's a simple client-server connection. The client is can be controlled by the server with commands sent over sockets (in plaintext). 
 
