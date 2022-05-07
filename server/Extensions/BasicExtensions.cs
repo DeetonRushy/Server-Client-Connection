@@ -37,7 +37,17 @@ public static class BasicExtensions
     }
     public static void Message(this Socket socket, string message)
     {
-        socket.Send(ServerController.GetBytes(message));
+        try
+        {
+            socket.Send(ServerController.GetBytes(message));
+        }
+        catch (SocketException)
+        {
+            socket?.Dispose();
+            Logger.Fatal($"the server has shutdown/disconnected you.", "Socket.Message");
+            Console.ReadKey();
+            Environment.Exit(-2);
+        }
     }
     public static Socket? Find(this IDictionary<Client, Socket> dict, string guidOrUserName)
     {

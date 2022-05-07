@@ -1,4 +1,5 @@
-﻿using System.Security.Principal;
+﻿using System.Diagnostics;
+using System.Security.Principal;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 
@@ -29,6 +30,7 @@ public class Program
             return File.ReadAllText($"{Directory.GetCurrentDirectory()}\\info\\COPYRIGHT.TXT");
         }
     }
+    public static ClientCommandHandler ClientCommandHandler { get; set; } = new();
 
     public static bool IsAdministrator()
     {
@@ -74,34 +76,6 @@ public class Program
             .WithOnMessageReceived((client, socket, data) =>
             {
                 TotalMessagesReceived++;
-                if (data[1] == "EXIT")
-                {
-                    Logger.Info($"{client.UserName} disconnected");
-                    client.OnUserDisconnect();
-                    Server.Clients[client].Dispose();
-                    Server.Clients.Remove(client);
-                    return;
-                }
-
-                if (!client.IsMuted)
-                {
-                    Console.WriteLine($"{client.UserName}: {data[1]}");
-                }
-                else
-                {
-                    Console.WriteLine($"{client.UserName}: {data[1]} (this message was not transmitted, they are muted for {client.TimeMuted})");
-                }
-
-                if (client.IsMuted)
-                {
-                    socket.Message($"You're currently muted & cannot send that message. (mute ends in {client.TimeMuted.TotalSeconds}s)");
-                    return;
-                }
-
-                foreach (var (_, sock) in Server.Clients)
-                {
-                    sock.Message($"{client.UserName}> {data[1]}");
-                }
             })
             .WithOnConnectionAccepted(client =>
             {
@@ -117,6 +91,8 @@ public class Program
 
                 var lengthOfReceivedData = client.Receive(data);
                 var readableData = data.String();
+
+                Console.WriteLine($"got data - {readableData}");
 
                 var receivedData = readableData.Replace("\0", "").Split(':');
 
@@ -197,7 +173,7 @@ public class Program
                             continue;
                         }
 
-                        Server.OnMessageReceived(savedClient, socket, data);
+                        ClientCommandHandler.Handle(received.String(), Server);
                     }
 
                     Logger.Info($"WorkerThread for {guid} stopped due to socket closing.");

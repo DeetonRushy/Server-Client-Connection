@@ -1,0 +1,15 @@
+﻿
+  ----------------------
+1. With the new permissions system, implement a UserCommandHandler.
+should be implemented just like the server command handler, except 
+some validation needs to go down. Do this operation before OnMessageReceived
+handler is called.
+   
+  (data - the data sent from the client, split into an array)
+ 
+  1. before calling OnMessageReceived, check if data[1] is a command
+    1. If true, call the command handler.
+    2. If false, call OnMessageReceived.
+  2. once the operation has completed, pass the message to OnMessageReceived.
+
+  ----------------------

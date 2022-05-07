@@ -3,10 +3,48 @@ using Newtonsoft.Json;
 
 namespace Server;
 
+public class Storage
+{
+    const string Empty = "";
+
+    private IDictionary<string, string> _storage;
+
+    public Storage()
+    {
+        _storage = new Dictionary<string, string>();
+    }
+
+    public void Insert(string Name, string Value)
+    {
+        if (_storage.ContainsKey(Name))
+            return;
+        _storage.Add(Name, Value);
+    }
+    public bool Query(string name)
+    {
+        return _storage.ContainsKey(name);
+    }
+    public string Fetch(string name)
+    {
+        if (!_storage.ContainsKey(name))
+            return Empty;
+        return _storage[name];
+    }
+    public void Set(string name, string value)
+    {
+        if (!Query(name))
+            return;
+
+        _storage[name] = value;
+    }
+}
+
 public class ServerCommandManager
 {
     public static string Owner { get; set; } = string.Empty;
-    public static string EMail { get; set; } = string.Empty;    
+    public static string EMail { get; set; } = string.Empty;
+    public Storage ClientStorage { get; set; } = new();
+    public Storage ServerStorage { get; set; } = new();
 
     public ServerCommandManager()
     {
@@ -270,8 +308,11 @@ public class ServerCommandManager
             clientsToUnmute.ForEach(x =>
             {
                 x.Key.TimeMuted = TimeSpan.Zero;
-                x.Key.MuteReason = String.Empty;
+                x.Key.MuteReason = string.Empty;
                 x.Key.Save();
+
+                Execute("server.send", new string[4] { "server.send", $"{x.Key.Id}", "client.settitle", "DClient" }, Program.Server);
+                Execute("server.pmsay", new string[3] { "server.pmsay", $"{x.Key.Id}", "You've been unmuted." }, Program.Server);
             });
 
         }, "Unmute a specific user.");
@@ -322,11 +363,17 @@ public class ServerCommandManager
                 server.Clients.Remove(clients[i]);
             }
 
-            Execute("server.accepting", new string[2] { "server.accepting", "False" }, server);
+            Program.Accepting = false;
 
         }, "Kick all clients. Acts as a panic button. This also disables new connections until you specifiy server.accepting true");
         Add("server.accepting", (args, server) =>
         {
+            if (args.Length != 2)
+            {
+                Logger.Info($"server.accepting: {Program.Accepting}");
+                return;
+            }
+
             if (!bool.TryParse(args[1], out var value))
             {
                 Logger.Warning($"'{args[1]}' is not a valid boolean value.");
@@ -435,6 +482,49 @@ public class ServerCommandManager
             }
             RegistryController.Write("MaxCapacity", value);
         }, "get or set the maximum capacity of the server.");
+        Add("server.store", (args, server) =>
+        {
+            // server.store -f|-s <key> <value>
+
+            if (args.Length < 3)
+            {
+                Logger.Warning($"usage: server.store [-f|-s] <key> [value] [-f: fetch key value, -s: save key with value]");
+                return;
+            }
+
+            var Option = args[1];
+
+            if (Option == "-f")
+            {
+                var Key = args[2];
+
+                if (!ServerStorage.Query(Key))
+                {
+                    Logger.Warning($"cannot fetch '{Key}', it has no value or doesn't exist.");
+                    return;
+                }
+
+                Logger.Info($"{Key}: {ServerStorage.Fetch(Key)}");
+                return;
+            }
+            else if (Option == "-s")
+            {
+                var Key = args[2];
+                var Value = args[3];
+
+                if (ServerStorage.Query(Key))
+                    ServerStorage.Set(Key, Value);
+                else
+                    ServerStorage.Insert(Key, Value);
+
+                return;
+            }
+            else
+            {
+                Logger.Warning($"unknown option [{Option}]. Available options are [-f, -s]");
+                return;
+            }
+        }, "fetch or save a value saved on the server.");
 
         // internal server based information, like owner-name, server-email, etc...
 

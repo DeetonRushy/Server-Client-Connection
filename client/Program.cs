@@ -161,17 +161,18 @@ public class ServerActionHandler
     {
         Add("client.printlocaldata", args =>
         {
-            Console.WriteLine( $"Current Port: {Program.Client.RemoteEndPoint.Port}" );
+            // print all local data on the client.
         });
-
         Add("client.settitle", args =>
         {
             Console.Title = $"{args}";
         });
-
         Add("client.close", args =>
         {
+            Console.WriteLine($"Server has asked for us to close. (closing in 5s)");
+            Program.Client.Send("EXIT");
             Thread.Sleep(TimeSpan.FromSeconds(5.0));
+            Environment.Exit(Environment.ExitCode);
         });
     }
 
@@ -202,6 +203,36 @@ public class ServerActionHandler
     public Dictionary<string, Action<string>> ServerActions { get; } = new();
 }
 
+public class TextParser
+{
+    public TextParser(string data)
+    {
+        if (!data.StartsWith(':'))
+        {
+            Command = "say";
+            Args = string.Join(" ", data);
+            Succeeded = true;
+            return;
+        }
+
+        data = data.Replace(":", string.Empty);
+        var Work = data.Split();
+
+        if (Work.Length < 2)
+        {
+            return;
+        }
+
+        Command = Work[0];
+        Args = string.Join(' ', Work.Skip(1));
+        Succeeded = true;
+    }
+
+    public string Command { get; set; } = string.Empty;
+    public string Args { get; set; } = string.Empty;
+    public bool Succeeded { get; set; } = false;
+}
+
 public static class Program
 {
     public static Client Client { get; } = new();
@@ -209,6 +240,8 @@ public static class Program
 
     public static void Main()
     {
+        Console.WriteLine("DClient - 2.8.90-release.2");
+
         ExternalFunctions.SetConsoleCtrlHandler(signal =>
         {
             if (signal == 2)
@@ -245,12 +278,13 @@ public static class Program
         {
             Console.Write($"{Client.UserName}> ");
             var Message = Console.ReadLine()!.Trim();
+            Message = Message!.lower()!.Normalize()!.TrimEnd();
             Console.WriteLine();
 
             if (Message is "")
                 continue;
 
-            if (Message == "exit")
+            if (Message == ":exit")
             {
                 if (Client.Sender.Connected)
                     Client.Send($"EXIT");
@@ -258,7 +292,11 @@ public static class Program
                 Environment.Exit(0);
             }
 
-            Client.Send(Message!.lower()!.Normalize()!.TrimEnd());
+            var CmdInfo = new TextParser(Message);
+
+            if (CmdInfo.Succeeded)
+                Client.Send($"{CmdInfo.Command}:{CmdInfo.Args}");
+
             Thread.Sleep(TimeSpan.FromSeconds(1));
         }
     }

@@ -42,7 +42,11 @@ public class ServerController
         {
             for (; ; )
             {
-                SpinWait.SpinUntil(() => Program.Accepting);
+                if (!Program.Accepting)
+                {
+                    Logger.Info($"This server is no longer accepting new connections.", "Server.BeginListen");
+                    SpinWait.SpinUntil(() => Program.Accepting);
+                }
                 var Connection = Listener!.Accept();
                 var result = OnClientConnection(Connection);
 

@@ -8,12 +8,17 @@ public class Client : IDisposable
     private bool disposedValue;
 
     // Json specific default constructor
+    [JsonConstructor]
     public Client() { }
 
-    public Client(Guid id, string userName)
+    public Client(Guid id, string userName = "")
     {
         Id = id;
-        UserName = userName;
+
+        if (userName != "")
+        {
+            UserName = userName;
+        }
 
         if (Directory.Exists($"{Directory.GetCurrentDirectory()}/users/{Id}"))
         {
@@ -56,6 +61,8 @@ public class Client : IDisposable
     public bool IsBanned { get; set; } = false;
     [JsonProperty("ban-reason")]
     public string BanReason { get; set; } = string.Empty;
+    [JsonProperty("permissions")]
+    public Permission Permissions { get; set; } = new(true);
 
     public bool IsMuted => (TimeMuted > TimeSpan.Zero);
     public void Mute(TimeSpan duration, string reason)
