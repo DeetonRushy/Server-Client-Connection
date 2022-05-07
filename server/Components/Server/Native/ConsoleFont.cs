@@ -1,5 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 
+/* Ctrl+C from https://stackoverflow.com/questions/47014258/c-sharp-modify-console-font-font-size-at-runtime */
+
 namespace Server;
 
 public static class ConsoleFont
