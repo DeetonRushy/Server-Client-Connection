@@ -30,12 +30,17 @@ public class Program
             return File.ReadAllText($"{Directory.GetCurrentDirectory()}\\info\\COPYRIGHT.TXT");
         }
     }
+
+    public static string DefinitionOf(string str) => Server.Fetch(str);
     public static ClientCommandHandler ClientCommandHandler { get; set; } = new();
 
     public static bool IsAdministrator()
     {
         var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
+
+        Logger.FLog($"IsAdmin: {principal.IsInRole(WindowsBuiltInRole.Administrator)}");
+
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
@@ -92,27 +97,25 @@ public class Program
                 var lengthOfReceivedData = client.Receive(data);
                 var readableData = data.String();
 
-                Console.WriteLine($"got data - {readableData}");
-
                 var receivedData = readableData.Replace("\0", "").Split(':');
 
                 if (receivedData.Length != 2)
                 {
-                    client.Send("401: authentication failed.".Bytes());
+                    client.Send("the server didn't get the expected response and was forced to disconnect you.".Bytes());
                     client.Close();
                     return false;
                 }
 
                 if (!Guid.TryParse(receivedData[0], out var guid))
                 {
-                    client.Send("401: authentication failed.".Bytes());
+                    client.Send("the client response contained invalid data that could not be parsed.".Bytes());
                     client.Close();
                     return false;
                 }
 
                 if (Server.Clients.UserConnected(guid))
                 {
-                    client.Message($"87: Only one client can connect at a time.");
+                    client.Message($"you're already connected from this account.");
                     Logger.Warning($"Declined connection from {guid}. They're connected on another client. ({Server.Clients.Where(x => x.Key.Id == guid).First().Key.UserName})");
                     return false;
                 }
@@ -121,12 +124,14 @@ public class Program
 
                 if (clientData.IsBanned)
                 {
-                    client.Message($"You've been permanently banned from this server for {clientData.BanReason}");
+                    client.Message(string.Format(DefinitionOf("SV_BAN_DETECTED_01"), clientData.BanReason));
                     client.Message($"client.close:Now");
                     return false;
                 }
 
                 Server.Clients.Add(clientData, client);
+                client.Message(DefinitionOf("CL_HTU_COMMANDS_HELP_01") + "\n");
+                client.Message("\n" + DefinitionOf("MISC_GITHUB_LINK") + "\n");
 
                 new Thread(() =>
                 {
@@ -160,7 +165,7 @@ public class Program
 
                         if (!Guid.TryParse(data[0], out var guid))
                         {
-                            client.Send("401: authentication failed.".Bytes());
+                            client.Send(DefinitionOf("SV_CONN_INVALID_RESPONSE_01").Bytes());
                             client.Close();
                             continue;
                         }
@@ -168,7 +173,7 @@ public class Program
                         var (savedClient, socket) = Server.Clients.ContainsClient(guid);
                         if (savedClient == null || socket == null)
                         {
-                            client.Send("202: your connection was rejected.".Bytes());
+                            client.Send(DefinitionOf("SV_CONN_UNKNOWN_SENDER_01").Bytes());
                             client.Close();
                             continue;
                         }
@@ -180,6 +185,7 @@ public class Program
 
                 }).Start();
                 Logger.Info($"{clientData.UserName}({clientData.Id}) has connected.");
+                client.Message($"{CommandManager.ServerStorage.Fetch("motd")}");
                 return true;
             })
             .WithPort(int.Parse(RegistryController.Read("ServerPort")!.ToString()))
@@ -189,11 +195,11 @@ public class Program
             .Build();
 
         Server.BeginListen();
+        // Wait for initial information to be sent.
+        Thread.Sleep(TimeSpan.FromSeconds(2));
 
         while (true)
         {
-            ServerName = (string?)RegistryController.Read("ServerName");
-
             Console.Write($"{ServerName}> ");
             var ConsoleResponse = Console.ReadLine();
 

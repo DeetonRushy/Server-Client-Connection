@@ -14,7 +14,7 @@ public class Permission
         _permissions = new Dictionary<string, bool>();
     }
 
-    public Permission(bool IsNormalCtor = true)
+    public Permission(bool IsNormalCtor)
     {
         _permissions = new Dictionary<string, bool>
         {
@@ -26,6 +26,11 @@ public class Permission
             { "store", false },
             { "say", true }
         };
+
+        _permissions.TryAdd("ban", false);
+        _permissions.TryAdd("mute", false);
+        _permissions.TryAdd("store", false);
+        _permissions.TryAdd("say", true);
     }
 
     public bool HasPermission(string perm)
@@ -52,5 +57,18 @@ public class Permission
             return;
 
         _permissions[perm] = false;
+    }
+
+    public override string ToString()
+    {
+        var array = new List<string>();
+
+        foreach (var (key, value) in _permissions)
+        {
+            if (value == true)
+                array.Add(key);
+        }
+
+        return $"[{string.Join(',', array)}]";
     }
 }

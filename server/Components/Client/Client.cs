@@ -13,6 +13,8 @@ public class Client : IDisposable
 
     public Client(Guid id, string userName = "")
     {
+        Logger.FLog($"loading user ({id})");
+
         Id = id;
 
         if (userName != "")
@@ -22,6 +24,7 @@ public class Client : IDisposable
 
         if (Directory.Exists($"{Directory.GetCurrentDirectory()}/users/{Id}"))
         {
+            Logger.FLog($"loading saved user from {Directory.GetCurrentDirectory()}/users/{Id}");
             string filePath = $"{Directory.GetCurrentDirectory()}/users/{Id}/USER.JSON";
 
             var fileContents = File.ReadAllText(filePath);
@@ -30,6 +33,8 @@ public class Client : IDisposable
 
             if (savedClientInfo != null)
             {
+                Logger.FLog($"users ({savedClientInfo.UserName}, {savedClientInfo.Id}) saved information loaded successfully, saving.");
+
                 TimeMuted = savedClientInfo.TimeMuted;
                 MuteReason = savedClientInfo.MuteReason;
                 IsBanned = savedClientInfo.IsBanned;
@@ -38,14 +43,21 @@ public class Client : IDisposable
 
             if (TimeMuted > TimeSpan.Zero)
             {
+                Logger.FLog($"user is muted, beginning ~dec cycle.");
+
                 OnMutedThread = new Thread(MuteLoop);
                 OnMutedThread.Start();
             }
+        }
+        else
+        {
+            Save();
         }
     }
 
     public void OnUserDisconnect()
     {
+        Logger.FLog($"user {UserName} has disconnected.");
         Save();
     }
 
@@ -131,7 +143,7 @@ public class Client : IDisposable
 
         try
         {
-            File.WriteAllText($"{Directory.GetCurrentDirectory()}/users/{Id}/USER.JSON", jsonResult);
+            Task.Run(async () => await File.WriteAllTextAsync($"{Directory.GetCurrentDirectory()}/users/{Id}/USER.JSON", jsonResult));
         }
         catch (Exception X) 
         {

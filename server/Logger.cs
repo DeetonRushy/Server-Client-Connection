@@ -27,4 +27,25 @@ public static class Logger
     {
         Log(information, "Fatal", caller);
     }
+
+    private static bool NewSession = true;
+
+    public static void FLog(string information)
+    {
+        const string FileName = "debug.log";
+
+        if (!File.Exists(FileName))
+        {
+            File.Create(FileName).Close();
+            File.AppendAllText(FileName, $"NEW SESSION ~0x{Directory.GetCurrentDirectory().GetHashCode():X2}");
+        }
+
+        if (NewSession)
+        {
+            File.AppendAllText(FileName, $"\n\nNEW SESSION ~0x{Directory.GetCurrentDirectory().GetHashCode():X2}\n\n");
+            NewSession = false;
+        }
+
+        File.AppendAllText(FileName, $"[{TimeOnly.FromDateTime(DateTime.Now).ToLongTimeString()}][Log] {information}\n");
+    }
 }

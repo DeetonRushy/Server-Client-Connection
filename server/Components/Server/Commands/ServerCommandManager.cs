@@ -3,21 +3,46 @@ using Newtonsoft.Json;
 
 namespace Server;
 
+[JsonObject(MemberSerialization.OptIn)]
 public class Storage
 {
     const string Empty = "";
 
-    private IDictionary<string, string> _storage;
+    [JsonProperty("storage-current", NullValueHandling = NullValueHandling.Ignore)]
+    public IDictionary<string, string> _storage { get; set; }
 
     public Storage()
     {
         _storage = new Dictionary<string, string>();
     }
 
+    public void Save(string path)
+    {
+        var Converted = JsonConvert.SerializeObject(this);
+
+        Task.Run(async () => await File.Create(path).DisposeAsync());
+        Task.Run(async () => await File.WriteAllTextAsync(path, Converted));
+    }
+
+    public void Load(string path)
+    {
+        // Most likely not been saved yet, np.
+        if (!File.Exists(path))
+            return;
+
+        var Converted = JsonConvert.DeserializeObject<Storage>(File.ReadAllText(path));
+        _storage = Converted._storage;
+
+        Logger.FLog($"loaded saved data from '{path}'");
+    }
+
     public void Insert(string Name, string Value)
     {
         if (_storage.ContainsKey(Name))
             return;
+
+        Logger.FLog($"[storage] saved {{ {Name}: {Value} }}");
+
         _storage.Add(Name, Value);
     }
     public bool Query(string name)
@@ -37,17 +62,59 @@ public class Storage
 
         _storage[name] = value;
     }
+
+    /// <summary>
+    /// Input: "Hello, {StorageVariableName}"
+    /// Output: "Hello, StorageVariableValue"
+    /// </summary>
+    /// <param name="format"></param>
+    /// <returns>the formated string, containing the values instead of names.</returns>
+    public string Format(string format)
+    {
+        string Result = string.Empty;
+
+        for (int i = 0; i < format.Length; i++)
+        {
+            string ctx = string.Empty;
+
+            if (format[i] != '{')
+            {
+                Result += format[i];
+                continue;
+            }
+
+            while (format[++i] != '}')
+                ctx += format[i];
+
+            if (!Query(ctx))
+                throw new FormatException($"failed to format string, variable {ctx} is not recognized");
+
+            var value = Fetch(ctx);
+
+            Result += value;
+        }
+
+        return Result;
+    }
 }
 
 public class ServerCommandManager
 {
     public static string Owner { get; set; } = string.Empty;
     public static string EMail { get; set; } = string.Empty;
-    public Storage ClientStorage { get; set; } = new();
-    public Storage ServerStorage { get; set; } = new();
+    public Storage ClientStorage = new();
+    public Storage ServerStorage = new();
+
+    readonly string ClientStoragePath = $"{Directory.GetCurrentDirectory()}\\data\\client-storage.json";
+    readonly string ServerStoragePath = $"{Directory.GetCurrentDirectory()}\\data\\server-storage.json";
 
     public ServerCommandManager()
     {
+        ServerStorage.Insert("motd", $"Welcome to {Program.ServerName}");
+
+        ClientStorage.Save(ClientStoragePath);
+        ServerStorage.Save(ServerStoragePath);
+
         // Initialize default commands.
         Commands = new Dictionary<string, Command>();
 
@@ -71,6 +138,7 @@ public class ServerCommandManager
             var newServerName = args[1];
 
             RegistryController.Write("ServerName", newServerName);
+            Program.ServerName = newServerName;
         }, "changes the default server name that clients will see.");
         Add("visual.font", (args, server) =>
         {
@@ -327,7 +395,7 @@ public class ServerCommandManager
 
             foreach (var (client, socket) in server.Clients)
             {
-                socket.Message($"\n[Server] {message}");
+                socket.Message($"\n[Server] {ServerStorage.Format(message)}");
             }
         }, $"Sends a message, abbreviated by '[{Program.ServerName}]' to all connected clients.");
         Add("server.dmsay", (args, server) =>
@@ -525,19 +593,93 @@ public class ServerCommandManager
                 return;
             }
         }, "fetch or save a value saved on the server.");
+        Add("server.grant", (args, server) =>
+        {
+            if (args.Length != 3)
+            {
+                Logger.Warning($"usage: server.grant <userid> <permission>");
+                return;
+            }
+
+            if (!Guid.TryParse(args[1], out var id))
+            {
+                Logger.Warning($"'{args[1]}' is not a valid user-id");
+                return;
+            }
+
+            if (!server.Clients.UserExists(id))
+            {
+                Logger.Warning($"No such user exists.");
+                return;
+            }
+
+            var (Client, Socket) = server.Clients.ContainsClient(id);
+
+            if (Client is null && Socket is null)
+            {
+                Logger.Warning($"can only give permissions to connected users.");
+                return;
+            }
+
+            Client?.Permissions.Give(args[2]);
+            Socket?.Message($"{Program.ServerName} granted you the permission '{args[2]}'");
+            Logger.FLog($"console granted {Client!.UserName} the permission {args[2]}");
+
+        }, "Grant a specific user a permission");
+        Add("server.revoke", (args, server) =>
+        {
+            if (args.Length != 3)
+            {
+                Logger.Warning($"usage: server.grant <userid> <permission>");
+                return;
+            }
+
+            if (!Guid.TryParse(args[1], out var id))
+            {
+                Logger.Warning($"'{args[1]}' is not a valid user-id");
+                return;
+            }
+
+            if (!server.Clients.UserExists(id))
+            {
+                Logger.Warning($"No such user exists.");
+                return;
+            }
+
+            var (Client, Socket) = server.Clients.ContainsClient(id);
+
+            if (Client is null && Socket is null)
+            {
+                Logger.Warning($"can only give permissions to connected users.");
+                return;
+            }
+
+            Client?.Permissions.Revoke(args[2]);
+            Socket?.Message($"{Program.ServerName} revoked you the permission '{args[2]}'");
+            Logger.FLog($"console revoked {Client!.UserName} the permission {args[2]}");
+
+        }, "Revoke a permission from a user");
 
         // internal server based information, like owner-name, server-email, etc...
 
         Add("info.owner", (args, server) =>
         {
-            if (args.Length != 2)
+            if (args.Length < 2)
             {
-                Logger.Info($"info.owner: {Owner}");
+                if (ServerStorage.Query("info.owner"))
+                {
+                    Logger.Info($"info.owner: {ServerStorage.Fetch("info.owner")}");
+                }
+
                 return;
             }
 
-            RegistryController.Write("ServerOwner", args[1]);
-            Owner = args[1];
+            var Result = string.Join(' ', args.Skip(1));
+
+            ServerStorage.Set("info.owner", Result);
+            Owner = Result;
+
+            ServerStorage.Save(ServerStoragePath);
         }, "Set the server owner string.");
         Add("info.email", (args, server) =>
         {
@@ -547,13 +689,34 @@ public class ServerCommandManager
                 return;
             }
 
-            RegistryController.Write("ServerEmail", args[1]);
+            ServerStorage.Set("info.email", args[1]);
             EMail = args[1];
+
+            ServerStorage.Save(ServerStoragePath);
         }, "Set the server e-mail");
         Add("info.copyright", (args, server) =>
         {
             Console.WriteLine(Program.Copyright);
         }, $"display the copyright information about this server build. ({Program.Version})");
+        Add("info.motd", (args, server) =>
+        {
+            if (args.Length == 1)
+            {
+                Console.WriteLine($"info.motd: {ServerStorage.Fetch("motd")}");
+                return;
+            }
+            var message = string.Join(' ', args);
+            if (ServerStorage.Query("motd"))
+            {
+                ServerStorage.Set("motd", message);
+                return;
+            }
+            else
+            {
+                ServerStorage.Set("motd", message);
+            }
+
+        }, "This message will be displayed when the client connects to the server. Short for 'Message Of The Day'");
 
         Logger.Info($"Initialized {Commands.Count} internal commands", "ServerCommandManager");
     }

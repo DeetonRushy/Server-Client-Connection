@@ -19,15 +19,20 @@ public static class RegistryController
         Logger.Info($"Initialized {DefaultRegValues.Count} values", "RegistryController");
 
         var regKey = Registry.CurrentUser.CreateSubKey(RegKey);
-        var regKeyKeys = regKey.GetValueNames().Skip(1); // ignore (default)
+        var regKeyKeys = regKey.GetValueNames(); // ignore (default)
 
         if (DefaultRegValues.Count == regKeyKeys.Count())
             return;
 
+        Logger.FLog($"initializing {DefaultRegValues.Count} keys, due to inconsistency with registry amount and our amount. ({DefaultRegValues.Count} != {regKeyKeys.Count()})");
+
         foreach (var (key, value) in DefaultRegValues)
         {
+            Logger.FLog($"\tinitializing {{ \"{key}\": \"{value}\" }}");
             regKey.SetValue(key, value);
         }
+
+        Program.ServerName = (string?)Read("ServerName");
     }
 
     public static object? Read(string key)

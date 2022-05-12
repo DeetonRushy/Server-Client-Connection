@@ -50,6 +50,8 @@ public static class ConsoleFont
         );
     public static void SetConsoleFont(string fontName = "Lucida Console")
     {
+        Logger.FLog($"attempting to set the console font to {fontName}");
+
         unsafe
         {
             IntPtr hnd = GetStdHandle(STD_OUTPUT_HANDLE);

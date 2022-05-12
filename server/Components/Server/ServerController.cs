@@ -15,6 +15,7 @@ public class ServerController
         Listener.Listen(10);
 
         Logger.Info("Initialized", "Server");
+        Logger.FLog($"server has started.");
 
         AddTitleInfo(() =>
         {
@@ -32,6 +33,13 @@ public class ServerController
 
         LocalEndPoint!.Port = port;
     }
+    public void Broadcast(string message)
+    {
+        foreach (var (_, sk) in Clients)
+        {
+            sk.Message($"{Program.ServerName}> {message}");
+        }
+    }
 
     public void BeginListen()
     {
@@ -45,6 +53,7 @@ public class ServerController
                 if (!Program.Accepting)
                 {
                     Logger.Info($"This server is no longer accepting new connections.", "Server.BeginListen");
+                    Broadcast("This server is now private & is not accepting new connections for now.");
                     SpinWait.SpinUntil(() => Program.Accepting);
                 }
                 var Connection = Listener!.Accept();
@@ -74,6 +83,7 @@ public class ServerController
     public List<Func<string>> TitleIdentifiers { get; } = new()
     {
     };
+    public ServerStringPool SavedMessages { get; set; } = new();
 
     public void AddTitleInfo(Func<string> Evaluator) => TitleIdentifiers.Add(Evaluator);
     public void RemoveTitleInfo(Func<string> Evaluator) => TitleIdentifiers.Remove(Evaluator);

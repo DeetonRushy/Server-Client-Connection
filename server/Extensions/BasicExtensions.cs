@@ -90,6 +90,10 @@ public static class BasicExtensions
     {
         return System.Text.Encoding.UTF8.GetString(arr);
     }
+    public static string Fetch(this ServerController controller, string message)
+    {
+        return controller.SavedMessages[message];
+    }
 }
 
 

@@ -22,11 +22,13 @@ public class ClientCommand
         {
             if (!client.Permissions.HasPermission(perm))
             {
+                Logger.FLog($"{client.UserName} attempted to execute {Name} with insufficient permissions.");
                 socket.Message($"insufficient permissions to execute {Name}");
                 return;
             }
         }
 
+        Logger.FLog($"'{client.UserName}' executed '{Name}' - {string.Join(',', args)}. {client.Permissions}");
         Callback(client, socket, args);
     }
 
@@ -36,6 +38,11 @@ public class ClientCommand
 
     public static ClientCommand Create(string Name, Action<Client, Socket, string[]> Callback, params string[] Permissions)
         => new(Name, Callback, Permissions);
+
+    public override string ToString()
+    {
+        return Name;
+    }
 }
 
 public class ClientCommandHandler
@@ -44,12 +51,16 @@ public class ClientCommandHandler
 
     public ClientCommandHandler()
     {
-        Logger.Info($"Initialized", "ClientCommandHandler");
-
         var SayCommand
             = ClientCommand.Create
             ("say", (client, socket, args) =>
             {
+                if (args.Length != 0 && args[0] == "/")
+                {
+                    socket.Message($"usage: :say [message]");
+                    return;
+                }
+
                 var Original = string.Empty;
                 args.ToList().ForEach(x => Original += x);
 
@@ -69,16 +80,19 @@ public class ClientCommandHandler
                 }
             }, "say");
 
-        Commands.Add(SayCommand);
-
         var BanCommand
             = ClientCommand.Create
             ("ban", (client, socket, args) =>
             {
                 if (args.Length < 1)
                 {
-                    socket.Message($"usage: :ban <user-id> [reason]");
+                    socket.Message(Program.DefinitionOf("CL_BAN_HELP"));
                     return;
+                }
+
+                if (args[0] == "/")
+                {
+                    socket.Message(Program.DefinitionOf("CL_BAN_HELP"));
                 }
 
                 var UserId = args[0];
@@ -120,11 +134,61 @@ public class ClientCommandHandler
                     User.Ban(Reason);
                 }
 
-                socket.Message($"banned {User.UserName} permanently");
+                socket.Message(string.Format(Program.DefinitionOf("CL_BAN_RESPONSE_01"), User.UserName));
+                Logger.FLog($"user '{client.UserName}' banned '{User.UserName}'");
 
             }, "ban");
 
+        var HelpCommand
+            = ClientCommand.Create
+            ("?", (client, socket, args) =>
+            {
+                socket.Message($"available commands: {string.Join(", ", Commands)}. Note: for commands you don't know any arguments to, use ':command /'");
+            });
+
+        var ExitCommand
+            = ClientCommand.Create
+            ("exit", (client, socket, args) =>
+            {
+                Program.Server.Clients.Remove(client);
+                socket.Disconnect(true);
+            });
+
+        var StorageCommand
+            = ClientCommand.Create
+            ("save", (client, socket, args) =>
+            {
+                ref var ServerStorage = ref Program.CommandManager.ServerStorage;
+
+                if (args.Length != 2)
+                {
+                    socket.Message(string.Format(Program.DefinitionOf("CL_INVALID_ARGUMENTS"), "save", "2", $"{args.Length}"));
+                    return;
+                }
+
+                var KeyName = args[0];
+                var Value = args[1];
+
+                ServerStorage.Insert(KeyName, Value);
+
+                socket.Message("saved successfully");
+            }, "store");
+
+        var FetchCommand
+            = ClientCommand.Create
+            ("fetch", (client, socket, args) =>
+            {
+
+            }, "store");
+
+        Commands.Add(SayCommand);
+        Commands.Add(HelpCommand);
         Commands.Add(BanCommand);
+        Commands.Add(ExitCommand);
+        Commands.Add(StorageCommand);
+
+        Logger.Info($"Initialized {Commands.Count} shared commands", "ClientCommandHandler");
+        Logger.FLog($"loaded {Commands.Count} server-client commands.");
     }
 
     public void Add
@@ -180,6 +244,7 @@ public class ClientCommandHandler
 
         var (Client, Socket) = server.Clients.ContainsClient(UserId);
 
+        // very unlikely case, but JUST incase.
         if (Client == null || Socket == null)
         {
             Logger.Warning($"received message from {UserId} but they're not connected. (?)");
@@ -212,8 +277,6 @@ public class ClientCommandHandler
         {
             Args[i] = Arguments[i] + " ";
         }
-
-        // Execute the command.
 
         Command.Execute(Client, Socket, Args);
 

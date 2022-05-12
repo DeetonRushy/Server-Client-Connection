@@ -1,4 +1,6 @@
-﻿using System.Net;
+﻿using PConsole;
+
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Diagnostics;
@@ -7,11 +9,9 @@ using System.Runtime.InteropServices;
 
 namespace Client;
 
-using BOOL = Boolean;
-
 public class TraceDataHandler
 {
-    public TraceDataHandler() 
+    public TraceDataHandler(bool IgnoreSavedId) 
     {
         var RegKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\ADDTClientSettings");
 
@@ -39,7 +39,14 @@ public class TraceDataHandler
             Tamper();
         }
 
-        GlobalGuid = globalUid;
+        if (IgnoreSavedId)
+        {
+            GlobalGuid = Guid.NewGuid();
+            UserName = new Random().Next().ToString();
+        }
+        else
+            GlobalGuid = globalUid;
+
         UserName = (string?)RegKey.GetValue("UserName");
 
         if (IsBanned == true)
@@ -54,6 +61,7 @@ public class TraceDataHandler
         RegKey.Close();
     }
 
+    [Obsolete("bans are now server sided")]
     public void BanUser(string reason)
     {
         var RegKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\ADDTClientSettings");
@@ -72,7 +80,7 @@ public class TraceDataHandler
         Environment.Exit(0);
     }
 
-    public BOOL? IsBanned { get; set; } = false;
+    public bool? IsBanned { get; set; } = false;
     public Guid? GlobalGuid { get; set; }
     public string? UserName { get; set; }
 }
@@ -80,7 +88,10 @@ public class Client
 {
     public Client()
     {
-        ClientStatus = new();
+        var args = Environment.GetCommandLineArgs();
+
+        ClientStatus = new(args.Contains("--fresh"));
+
         UserName = ClientStatus.UserName;
         Id = ClientStatus.GlobalGuid;
 
@@ -170,9 +181,14 @@ public class ServerActionHandler
         Add("client.close", args =>
         {
             Console.WriteLine($"Server has asked for us to close. (closing in 5s)");
-            Program.Client.Send("EXIT");
+            Program.Client.Send("exit:/");
             Thread.Sleep(TimeSpan.FromSeconds(5.0));
             Environment.Exit(Environment.ExitCode);
+        });
+        Add("client.pprint", args =>
+        {
+            var str = string.Join(' ', args);
+            PrettyConsole.WriteLine(str);
         });
     }
 
@@ -225,6 +241,10 @@ public class TextParser
 
         Command = Work[0];
         Args = string.Join(' ', Work.Skip(1));
+
+        if (Args.Length == 0)
+            Args = "/";
+
         Succeeded = true;
     }
 
@@ -240,13 +260,12 @@ public static class Program
 
     public static void Main()
     {
-        Console.WriteLine("DClient - 2.8.90-release.2");
-
         ExternalFunctions.SetConsoleCtrlHandler(signal =>
         {
             if (signal == 2)
             {
-                Client.Send("EXIT");
+                Client.Send("exit:/");
+                Thread.Sleep(TimeSpan.FromSeconds(2)); // make sure the data is actually received by the server.
                 return true;
             }
 
@@ -274,8 +293,13 @@ public static class Program
 
         }).Start();
 
+        // Wait for server messages.
+        Thread.Sleep(TimeSpan.FromSeconds(3));
+
         while (true)
         {
+            Thread.Sleep(TimeSpan.FromSeconds(1));
+
             Console.Write($"{Client.UserName}> ");
             var Message = Console.ReadLine()!.Trim();
             Message = Message!.lower()!.Normalize()!.TrimEnd();
@@ -287,7 +311,7 @@ public static class Program
             if (Message == ":exit")
             {
                 if (Client.Sender.Connected)
-                    Client.Send($"EXIT");
+                    Client.Send($"exit:/");
                 Thread.Sleep(TimeSpan.FromSeconds(3));
                 Environment.Exit(0);
             }
@@ -296,8 +320,6 @@ public static class Program
 
             if (CmdInfo.Succeeded)
                 Client.Send($"{CmdInfo.Command}:{CmdInfo.Args}");
-
-            Thread.Sleep(TimeSpan.FromSeconds(1));
         }
     }
 }

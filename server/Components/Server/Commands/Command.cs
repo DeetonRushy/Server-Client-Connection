@@ -6,6 +6,8 @@ public class Command
     {
         Description = desc;
         Function = function;
+
+        Logger.FLog($"command was created, meta info - '{desc}'");
     }
 
     public string Description { get; } = string.Empty;

@@ -11,4 +11,10 @@
     <None Include="..\.editorconfig" Link=".editorconfig" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="PrettyConsole">
+      <HintPath>..\..\ConsoleColorHelper\PrettyConsoleTests\bin\Debug\net6.0\PrettyConsole.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
