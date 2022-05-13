@@ -22,12 +22,12 @@ public class Program
     {
         get
         {
-            if (!Directory.Exists($"{Directory.GetCurrentDirectory()}\\info\\COPYRIGHT.TXT"))
+            if (!Directory.Exists($"{Directory.GetCurrentDirectory()}\\data\\licenses\\LICENSE.txt"))
             {
                 return "No copyright file found.";
             }
 
-            return File.ReadAllText($"{Directory.GetCurrentDirectory()}\\info\\COPYRIGHT.TXT");
+            return File.ReadAllText($"{Directory.GetCurrentDirectory()}\\data\\licenses\\LICENSE.txt");
         }
     }
 

@@ -1,0 +1,21 @@
+{
+  // when the user has first connected, this message is displayed if they're already banned.
+  "SV_BAN_DETECTED_01": "You're permanently banned from this server for {0}.",
+  // when the user does ':ban /'
+  "CL_BAN_HELP": "usage: :ban <user-id> [reason]",
+  // used when the client sends incorrect information to the server.
+  "SV_CONN_INVALID_RESPONSE_01": "203: your client did not send the correct information.",
+  // when the client doesn't send their unique identifier or their identifier doesn't exist.
+  "SV_CONN_NOT_AUTHORIZED_01": "404: your connection was rejected. You're not authorized.'",
+  // when there is a connection attempting to send messages but they're not connected.
+  "SV_CONN_UNKNOWN_SENDER_01": "102: you must have connected to the server in order to send messages.",
+  // sent at the start, a dynamic way of informing the client how to use commands.
+  "CL_HTU_COMMANDS_HELP_01": "Type ':? /' to get started with server commands.",
+  // response to the *banner* when someone is banned.
+  "CL_BAN_RESPONSE_01": "banned {0} permanently.",
+  // for when a shared commands has incorrect arguments. (command expected X arguments, but got X)
+  "CL_INVALID_ARGUMENTS": "{0} expected {1} arguments, but got {2}",
+
+
+  "MISC_GITHUB_LINK": "OpenSource - https://github.com/DeetonRushy/Server-Client-Connection"
+}

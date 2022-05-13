@@ -260,6 +260,8 @@ public static class Program
 
     public static void Main()
     {
+        Notifier.Show("Welcome To DChat!", "Type ':? /' to get started :^)");
+
         ExternalFunctions.SetConsoleCtrlHandler(signal =>
         {
             if (signal == 2)

@@ -18,7 +18,7 @@ public class Storage
 
     public void Save(string path)
     {
-        var Converted = JsonConvert.SerializeObject(this);
+        var Converted = JsonConvert.SerializeObject(this, Formatting.Indented);
 
         Task.Run(async () => await File.Create(path).DisposeAsync());
         Task.Run(async () => await File.WriteAllTextAsync(path, Converted));
@@ -375,7 +375,8 @@ public class ServerCommandManager
 
             clientsToUnmute.ForEach(x =>
             {
-                x.Key.TimeMuted = TimeSpan.Zero;
+                // The date-time the mute will end is before the current time.
+                x.Key.TimeMuted = DateTime.Now - TimeSpan.FromSeconds(1);
                 x.Key.MuteReason = string.Empty;
                 x.Key.Save();
 

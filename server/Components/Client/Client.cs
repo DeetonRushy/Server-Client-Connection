@@ -41,9 +41,9 @@ public class Client : IDisposable
                 BanReason = savedClientInfo.BanReason;
             }
 
-            if (TimeMuted > TimeSpan.Zero)
+            if (IsMuted)
             {
-                Logger.FLog($"user is muted, beginning ~dec cycle.");
+                Logger.FLog($"{Id} is muted for {TimeMuted - DateTime.Now}");
 
                 OnMutedThread = new Thread(MuteLoop);
                 OnMutedThread.Start();
@@ -65,8 +65,8 @@ public class Client : IDisposable
     public Guid Id { get; set; }
     [JsonProperty("user-name")]
     public string UserName { get; set; }
-    [JsonProperty("mute-duration")]
-    public TimeSpan TimeMuted { get; set; } = TimeSpan.FromSeconds(0);
+    [JsonProperty("datetime-unmuted")]
+    public DateTime TimeMuted { get; set; } = DateTime.MinValue;
     [JsonProperty("mute-reason")]
     public string MuteReason { get; set; } = string.Empty;
     [JsonProperty("is-banned")]
@@ -76,17 +76,16 @@ public class Client : IDisposable
     [JsonProperty("permissions")]
     public Permission Permissions { get; set; } = new(true);
 
-    public bool IsMuted => (TimeMuted > TimeSpan.Zero);
+    public bool IsMuted => DateTime.Now < TimeMuted;
     public void Mute(TimeSpan duration, string reason)
     {
-        TimeMuted = duration;
+        TimeMuted = DateTime.Now + duration;
         MuteReason = reason;
 
         Program.CommandManager.Execute("server.globalsay", new string[2] { "server.say", $"{UserName} has been muted for {reason} - duration: {duration.Days}d{duration.Minutes}m{duration.Seconds}s" }, Program.Server);
         Logger.Info($"Muted {UserName} for '{reason}', {duration.TotalSeconds}s");
 
         OnMutedThread = new Thread(MuteLoop);
-        OnMutedThread.Start();
         Save();
     }
 
@@ -101,28 +100,7 @@ public class Client : IDisposable
 
         Save();
     }
-    private void MuteLoop()
-    {
-    RestartMute:
-        while (IsMuted)
-        {
-            var TimeSpanToSleepFor = TimeSpan.FromSeconds(2);
-            Thread.Sleep(TimeSpanToSleepFor);
-            TimeMuted -= TimeSpanToSleepFor;
-            var AvailableClient = Program.Server.Clients.Where(x => x.Key.Id == Id);
-
-            // No escaping mutes by disconnecting, mutes must be served through online time.
-            if (AvailableClient.Count() == 0)
-                break;
-
-            AvailableClient.First().Value.Message($"client.settitle:You've been muted. {TimeMuted.Minutes}m{TimeMuted.Seconds}s left");
-
-            Save();
-        }
-
-        SpinWait.SpinUntil(() => IsMuted);
-        goto RestartMute;
-    }
+    private void MuteLoop() => SpinWait.SpinUntil(() => !IsMuted);
 
     public static Client Create(Guid id, string userName) => new(id, userName);
 

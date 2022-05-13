@@ -5,7 +5,10 @@ public static class Logger
 {
     private static void Log(string data, string type, string caller)
     {
-        Console.WriteLine($"({caller})[{TimeOnly.FromDateTime(DateTime.Now).ToLongTimeString()}][{type}] {data}");
+        Task.Run(async () =>
+        {
+            await Console.Out.WriteLineAsync($"({caller})[{TimeOnly.FromDateTime(DateTime.Now).ToLongTimeString()}][{type}] {data}");
+        });
     }
 
     public static void Info(string information, string caller = "Unknown")
