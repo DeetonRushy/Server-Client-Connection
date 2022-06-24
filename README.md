@@ -1,3 +1,5 @@
+# WARNING: POORLY WRITTEN README AHEAD!
+
 ## C# Client-Server Connection (Windows)
 
 This is my first ever experience with anything connection based. It's a simple client-server connection. The client can be controlled by the server with commands sent over sockets (in plaintext). It requires the .NET6.0 Runtime. 
